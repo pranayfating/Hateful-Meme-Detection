@@ -713,12 +713,11 @@ class VisualBERTCaption(VisualBERT):
 
         visual_bert_feature = output_dict["pooled_output"]
         caption_features = self.language_module(sample_list['caption'])[1]
+        text_features = self.language_module(sample_list['actual_text'])[1]
 
-#         print(visual_bert_feature.shape)
-#         print(caption_features.shape)
-#         assert False
+        tensor_fused_input =  torch.matmul(text_features, caption_features)
         
-        combined = torch.cat((visual_bert_feature,caption_features), dim=1)
+        combined = torch.cat((visual_bert_feature,tensor_fused_input), dim=1)
 
         logits = self.classifier2(combined)
         output_dict["scores"] = logits
