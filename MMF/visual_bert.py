@@ -586,84 +586,14 @@ class VisualBERT(BaseModel):
         return output_dict
 
 
+
+
+    
+    
 from mmf.utils.build import build_classifier_layer
-
-@registry.register_model("my_visual_bert")
-class MyVisualBERT(VisualBERT):
-    def __init__(self, config):
-        super().__init__(config)
-        self.config = config
-        self.training_head_type: str = self.config.training_head_type
-    
-    @classmethod
-    def config_path(cls):
-        return "configs/models/visual_bert/my_model.yaml"
-    
-    def build(self):
-        if self.training_head_type == "pretraining":
-            self.model = VisualBERTForPretraining(self.config)
-        else:
-            self.model = VisualBERTForClassification(self.config)
-
-        if self.config.special_visual_initialize:
-            self.model.bert.embeddings.initialize_visual_from_pretrained()
-
-        if getattr(self.config, "freeze_base", False):
-            for p in self.model.bert.parameters():
-                p.requires_grad = False
-        self.classifier = build_classifier_layer(self.config.classifier)
-        
-    def get_optimizer_parameters(self, config):
-        return get_optimizer_parameters_for_bert(self.model, config) + [{"params": list(self.classifier.parameters())}]
-    
-    def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        if torch.jit.is_scripting():
-            assert (
-                "image_feature_0" in sample_list
-            ), "Key 'image_feature_0' is required in TorchScript model"
-
-        sample_list = self.update_sample_list_based_on_head(sample_list)
-        sample_list = self.add_custom_params(sample_list)
-        sample_list = self.flatten_for_bert(sample_list)
-        sample_list = self.add_post_flatten_params(sample_list)
-
-        output_dict = self.model(
-            sample_list["input_ids"],
-            sample_list["input_mask"],
-            sample_list["attention_mask"],
-            sample_list["token_type_ids"],
-            sample_list["visual_embeddings"],
-            sample_list["visual_embeddings_type"],
-            getattr_torchscriptable(sample_list, "image_text_alignment", None),
-            getattr_torchscriptable(sample_list, "masked_lm_labels", None),
-        )
-
-        if self.training_head_type == "pretraining":
-            if not torch.jit.is_scripting():
-                loss_key = "{}/{}".format(
-                    sample_list["dataset_name"], sample_list["dataset_type"]
-                )
-                output_dict["losses"] = {}
-                output_dict["losses"][loss_key + "/masked_lm_loss"] = output_dict.pop(
-                    "masked_lm_loss"
-                )
-            else:
-                raise RuntimeError("Pretraining head can't be used in script mode.")
-
-        output_dict['masked_lm_scores'] = output_dict['scores']
-        
-#         print(output_dict['scores'].shape,sample_list["text_senti"].shape,sample_list["img_senti"].shape)
-        combined = torch.cat([output_dict['masked_lm_scores'], sample_list["text_senti"],sample_list["img_senti"],sample_list["text_senti"]-sample_list["img_senti"]], dim=1)
-
-        logits = self.classifier(combined)
-        output_dict["scores"] = logits
-        return output_dict
-
-    
-    
 from mmf.utils.build import build_text_encoder
-    
-@registry.register_model("visual_bert_caption")
+
+@registry.register_model("visual_bert_TTF")
 class VisualBERTCaption(VisualBERT):
     def __init__(self, config):
         super().__init__(config)
@@ -672,7 +602,7 @@ class VisualBERTCaption(VisualBERT):
     
     @classmethod
     def config_path(cls):
-        return "configs/models/visual_bert/my_model2.yaml"
+        return "configs/models/visual_bert/TTF_model.yaml"
     
     def build(self):
         self.model = VisualBERTForClassification(self.config)
@@ -683,11 +613,11 @@ class VisualBERTCaption(VisualBERT):
         if getattr(self.config, "freeze_base", False):
             for p in self.model.bert.parameters():
                 p.requires_grad = False
-        self.classifier2 = build_classifier_layer(self.config.classifier)
+        self.classifier = build_classifier_layer(self.config.classifier)
         self.language_module = build_text_encoder(self.config.text_encoder)
         
     def get_optimizer_parameters(self, config):
-        return get_optimizer_parameters_for_bert(self.model, config) + [{"params": list(self.classifier2.parameters())}] + [{"params": list(self.language_module.parameters())}]
+        return get_optimizer_parameters_for_bert(self.model, config) + [{"params": list(self.classifier.parameters())}] + [{"params": list(self.language_module.parameters())}]
     
     def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if torch.jit.is_scripting():
@@ -697,7 +627,6 @@ class VisualBERTCaption(VisualBERT):
 
         sample_list = self.update_sample_list_based_on_head(sample_list)
         sample_list = self.add_custom_params(sample_list)
-        sample_list = self.flatten_for_bert(sample_list)
         sample_list = self.add_post_flatten_params(sample_list)
 
         output_dict = self.model(
@@ -715,71 +644,17 @@ class VisualBERTCaption(VisualBERT):
         caption_features = self.language_module(sample_list['caption'])[1]
         text_features = self.language_module(sample_list['actual_text'])[1]
 
+        caption_features = self.flatten_for_bert(text_features)
+        text_features = self.flatten_for_bert(caption_features)
+
+        caption_features.append(1)
+        text_features.append(1)
+
+        # Text tensor fusion
         tensor_fused_input =  torch.matmul(text_features, caption_features)
         
         combined = torch.cat((visual_bert_feature,tensor_fused_input), dim=1)
 
-        logits = self.classifier2(combined)
-        output_dict["scores"] = logits
-        return output_dict
-
-@registry.register_model("visual_bert_all")
-class VisualBERTCaption(VisualBERT):
-    def __init__(self, config):
-        super().__init__(config)
-        self.config = config
-        self.training_head_type: str = self.config.training_head_type
-    
-    @classmethod
-    def config_path(cls):
-        return "configs/models/visual_bert/my_model3.yaml"
-    
-    def build(self):
-        self.model = VisualBERTForClassification(self.config)
-
-        if self.config.special_visual_initialize:
-            self.model.bert.embeddings.initialize_visual_from_pretrained()
-
-        if getattr(self.config, "freeze_base", False):
-            for p in self.model.bert.parameters():
-                p.requires_grad = False
-        self.classifier2 = build_classifier_layer(self.config.classifier)
-        self.language_module = build_text_encoder(self.config.text_encoder)
-        
-    def get_optimizer_parameters(self, config):
-        return get_optimizer_parameters_for_bert(self.model, config) + [{"params": list(self.classifier2.parameters())}] + [{"params": list(self.language_module.parameters())}]
-    
-    def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        if torch.jit.is_scripting():
-            assert (
-                "image_feature_0" in sample_list
-            ), "Key 'image_feature_0' is required in TorchScript model"
-
-        sample_list = self.update_sample_list_based_on_head(sample_list)
-        sample_list = self.add_custom_params(sample_list)
-        sample_list = self.flatten_for_bert(sample_list)
-        sample_list = self.add_post_flatten_params(sample_list)
-
-        output_dict = self.model(
-            sample_list["input_ids"],
-            sample_list["input_mask"],
-            sample_list["attention_mask"],
-            sample_list["token_type_ids"],
-            sample_list["visual_embeddings"],
-            sample_list["visual_embeddings_type"],
-            getattr_torchscriptable(sample_list, "image_text_alignment", None),
-            getattr_torchscriptable(sample_list, "masked_lm_labels", None),
-        )
-
-        visual_bert_feature = output_dict["pooled_output"]
-        caption_features = self.language_module(sample_list['caption'])[1]
-
-#         print(visual_bert_feature.shape)
-#         print(caption_features.shape)
-#         assert False
-        
-        combined = torch.cat((visual_bert_feature,caption_features,sample_list["text_senti"],sample_list["img_senti"],sample_list["text_senti"]-sample_list["img_senti"]), dim=1)
-
-        logits = self.classifier2(combined)
+        logits = self.classifier(combined)
         output_dict["scores"] = logits
         return output_dict

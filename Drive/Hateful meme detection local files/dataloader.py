@@ -272,15 +272,13 @@ class mydataset_captioning():
             for line in f:
                 result = json.loads(line)
     
-                path, temp_caption, label = result['img'], result['text'], result['label']
-                
-                temp_index = temp_caption.index("[SEP]")
-                caption, generated_caption = temp_caption[:temp_index], temp_caption[temp_index+5:]
+                path, text, label, caption = result['img'], result['text'], result['label'], result['caption']
+
                 
 
                 self.X.append('/content/gdrive/MyDrive/Kaggle/facebook-hateful-meme-dataset/data/'+path)
-                self.true_Cap.append(caption)
-                self.generated_Cap.append(generated_caption)
+                self.true_Cap.append(text)
+                self.generated_Cap.append(caption)
                 self.Y.append(label)
                 
         
@@ -366,15 +364,10 @@ class mytestdataset_captioning():
             for line in f:
                 result = json.loads(line)
     
-                path, temp_caption = result['img'], result['text']
-                
-                temp_index = temp_caption.index("[SEP]")
-                caption, generated_caption = temp_caption[:temp_index], temp_caption[temp_index+5:]
-                
-
+                path, text, caption= result['img'], result['text'], result['caption']
                 self.X.append('/content/gdrive/MyDrive/Kaggle/facebook-hateful-meme-dataset/data/'+path)
-                self.true_Cap.append(caption)
-                self.generated_Cap.append(generated_caption)
+                self.true_Cap.append(text)
+                self.generated_Cap.append(caption)
                 self.Imagename.append(path.split('/')[1][:-4])
         
         

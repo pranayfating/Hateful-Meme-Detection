@@ -19,21 +19,25 @@ Dataset will be protected with a password, which you can get from the same downl
 
 ## Experiments
 
-### ResNeXt+BERT+TF
+### ResNeXt+BERT+TTF
 
 1. Upload all the contents of the "Drive" folder to your drive.
 2. Change the appropriate paths of local files as given in the code.
 3. Run ```resnext101_32x8d.ipynb```. This will save ```resnext101_32x8d.tar``` file on your drive in ```saved_model_checkpoints``` folder.
 4. Run ```BERT.ipynb```. This will save ```BERT.tar``` file on your drive in ```saved_model_checkpoints``` folder.
-5. Now in ```BERT+ResNeXt+TF.ipynb``` change the paths of the above two ```tar``` files and also the dataset files.
+5. Now in ```BERT+ResNeXt+TTF.ipynb``` change the paths of the above two ```tar``` files and also the dataset files.
 
-### VisualBERT+TF
+### VisualBERT+TTF
 
 1. First download the mmf library from the commands given in the code.
+2. Download the dataset from the commands given in the code.
+3. Change the dataset files with the captioned dataset.
 2. Change the following files with files given in the above ```MMF``` folder.
     ```
     1. defaults.yaml   -    mmf/configs/datasets/hateful_memes/defaults.yaml
     2. dataset.py   -   mmf/datasets/builders/hateful_memes/dataset.py
     3. defaults.yaml    -   projects/visual_bert/configs/hateful_memes/defaults.yaml
-    4. visual_bert.py    -   mmf/models/visual_bert.py```
-3. Run the ```VisualBERT+TF.ipynb``` file.
+    4. visual_bert.py    -   mmf/models/visual_bert.py
+
+    ```
+3. Run the ```VisualBERT+TTF.ipynb``` file.
